@@ -2,6 +2,7 @@
 //super slow clock driver by Raphael Abrams
 #define _XTAL_FREQ 32768
 #define PULSEWIDTH 15
+#define TIMESTRETCH 730
 #include <htc.h>
 #include <stdio.h>
 
@@ -10,6 +11,7 @@
 __CONFIG(0x0FE0);
 __CONFIG(0x1CFF);  //__CONFIG(0x1403);
 volatile near unsigned char tickCounter;
+volatile near unsigned int stretcher=0;
 
 void init(void){
 
@@ -30,8 +32,8 @@ void init(void){
 	 //which are as slow as possible with both post and prescalers maxed out
 	PR2	= 8;
 
-	TRISA = 0b11111100;
-	PORTA=0b11111111;
+	TRISA = 0b11111000;
+	PORTA=0b11111011;
 	
 	ei();	// Global interrupts enabled
 }
@@ -40,25 +42,42 @@ void main(void){
 	int x=0;
 	init();
 	tickCounter = 0;
-	while(1){x++;}
+			PORTA=0b11111010;
+			__delay_ms(50);
+			PORTA=0b11111011;
+			__delay_ms(50);
+			PORTA=0b11111010;
+			__delay_ms(50);
+			PORTA=0b11111011;
+
+        while(1){x++;}
 }
 
 void interrupt isr(void){
+//  Timer 2 Code
+    if((TMR2IE)&&(TMR2IF)){
+        stretcher++;
 
-	//  Timer 2 Code
-	if((TMR2IE)&&(TMR2IF)){
-		if(tickCounter == 1){
-			PORTA=0b11111110;
-			__delay_ms(PULSEWIDTH);
-			PORTA=0b11111111;
+        if(stretcher%20==0){
+        PORTA=0b11111111;
+	__delay_ms(PULSEWIDTH);
+	PORTA=0b11111011;
+        }
+        if(stretcher==TIMESTRETCH){
+            stretcher=0;
+                if(tickCounter == 1){
+			PORTA=0b11111010;
+			//__delay(5);
+			PORTA=0b11111011;
 			tickCounter=0;		
-		}
+        	}
 		else if(tickCounter == 0){
 			PORTA=0b11111101;
 			__delay_ms(PULSEWIDTH);
 			PORTA=0b11111111;
 			tickCounter=1;		
 		}
-		TMR2IF=0;	// clear event flag
 	}
+    }
+    TMR2IF=0;	// clear event flag
 }
